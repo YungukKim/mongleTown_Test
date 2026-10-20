@@ -75,3 +75,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - UI 문구는 따뜻한 해요체로 쓴다. 되돌리기 어려운 동작(구매·이사·친구 끊기·탈퇴 등)에는 `confirmDialog`를 띄운다.
 - 키보드 조작과 `aria-label`을 유지하고, 움직임 줄이기 설정(`html.reduce-motion`)을 지킨다.
 - 커밋 메시지는 한국어로 쓴다.
+
+## SEO · AEO · GEO
+
+- 앱 화면은 해시 라우트라 검색되지 않는다. 검색·AI 답변용 내용은 정적 페이지 `about.html`, `faq.html`과 `index.html`의 `.seo-fallback`(JS가 켜지면 숨김), `llms.txt`에 있다.
+- **사실이 바뀌면 함께 고친다**: 집 수, 아이템 수·가격대, 충전 상품표, 환영 몽글, 쪽지 규칙 등은 위 파일들과 FAQ의 JSON-LD(`FAQPage`)에 똑같이 적혀 있다. 고치면 `dateModified`·`lastmod`·"마지막 업데이트" 날짜도 바꾼다.
+- 절대 주소(canonical, og:url, sitemap, robots의 Sitemap, llms.txt 링크)는 배포 도메인을 그대로 쓴다. 도메인이 바뀌면 저장소 전체에서 이전 주소를 찾아 바꾼다.
+- `og-image.png`(1200×630)와 `icon-512.png`는 PowerShell `System.Drawing`으로 그렸다. 다시 만들 때도 흑백 선화 규칙을 지킨다.
+- `vercel.json`의 `cleanUrls`로 `/about`, `/faq`가 열린다. 로컬 `serve.ps1`도 같은 방식으로 확장자 없는 주소를 처리한다.

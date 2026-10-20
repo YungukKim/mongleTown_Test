@@ -1,0 +1,14 @@
+{
+  "name": "몽글마을!",
+  "short_name": "몽글마을",
+  "description": "집을 고르고 방을 꾸미고 이웃과 쪽지를 나누는 웹 힐링 소셜 게임",
+  "lang": "ko",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fffefb",
+  "theme_color": "#fffefb",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

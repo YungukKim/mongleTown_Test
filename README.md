@@ -18,7 +18,10 @@ js/api.js                  Supabase 호출 계층 (화면은 이것만 사용)
 js/pages/*.js              화면별 코드
 supabase/migrations/       DB 스키마·시드·RPC 함수 (이미 mongletown 프로젝트에 적용됨)
 supabase/functions/toss-payments/   결제 승인·환불 Edge Function
-vercel.json                Vercel 헤더 설정
+about.html · faq.html      검색·AI가 읽는 정적 소개·FAQ 페이지 (구조화 데이터 포함)
+robots.txt · sitemap.xml · llms.txt   크롤러·AI 답변 엔진용 파일
+og-image.png · icon-512.png · favicon.svg · site.webmanifest   공유 미리보기·아이콘
+vercel.json                Vercel 헤더·cleanUrls 설정
 ```
 
 ## 서버에서 지키는 규칙

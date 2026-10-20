@@ -3,8 +3,65 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>몽글마을!</title>
-  <meta name="description" content="바쁜 하루 끝에, 서로의 안부를 묻는 작은 마을" />
+  <title>몽글마을! — 집을 고르고 방을 꾸미는 힐링 소셜 게임</title>
+  <meta name="description" content="몽글마을은 빈집을 골라 입주하고, 가구로 방을 꾸미고, 이웃과 안부 쪽지를 나누는 무료 웹 힐링 소셜 게임이에요. 설치 없이 브라우저에서 바로 시작해요." />
+  <link rel="canonical" href="https://mongletowntest.vercel.app/" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="theme-color" content="#fffefb" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="alternate" type="text/plain" href="https://mongletowntest.vercel.app/llms.txt" title="LLM용 사이트 요약" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="몽글마을!" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta property="og:url" content="https://mongletowntest.vercel.app/" />
+  <meta property="og:title" content="몽글마을! — 집을 고르고 방을 꾸미는 힐링 소셜 게임" />
+  <meta property="og:description" content="빈집에 입주하고, 방을 꾸미고, 이웃과 쪽지를 나누는 작은 마을. 바쁜 하루 끝에 서로의 안부를 물어요." />
+  <meta property="og:image" content="https://mongletowntest.vercel.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="연필 선으로 그린 몽글마을의 집과 아파트" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="몽글마을! — 집을 고르고 방을 꾸미는 힐링 소셜 게임" />
+  <meta name="twitter:description" content="빈집에 입주하고, 방을 꾸미고, 이웃과 쪽지를 나누는 작은 마을." />
+  <meta name="twitter:image" content="https://mongletowntest.vercel.app/og-image.png" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://mongletowntest.vercel.app/#website",
+        "url": "https://mongletowntest.vercel.app/",
+        "name": "몽글마을!",
+        "alternateName": ["몽글마을", "Mongle Town"],
+        "inLanguage": "ko-KR",
+        "description": "집을 고르고 방을 꾸미고 이웃과 쪽지를 나누는 웹 힐링 소셜 게임"
+      },
+      {
+        "@type": ["VideoGame", "WebApplication"],
+        "@id": "https://mongletowntest.vercel.app/#game",
+        "name": "몽글마을!",
+        "url": "https://mongletowntest.vercel.app/",
+        "image": "https://mongletowntest.vercel.app/og-image.png",
+        "description": "빈집을 골라 입주하고, 가구로 방을 꾸미고, 이웃과 안부 쪽지·친구·좋아요를 주고받는 웹 힐링 소셜 게임이에요.",
+        "inLanguage": "ko-KR",
+        "applicationCategory": "GameApplication",
+        "genre": ["힐링 게임", "소셜 게임", "방 꾸미기"],
+        "gamePlatform": "웹 브라우저",
+        "operatingSystem": "Windows, macOS, Android, iOS (웹 브라우저)",
+        "playMode": "MultiPlayer",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" },
+        "isPartOf": { "@id": "https://mongletowntest.vercel.app/#website" }
+      }
+    ]
+  }
+  </script>
+
+  <script>document.documentElement.classList.add('js');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Gowun+Dodum&display=swap" rel="stylesheet" />
@@ -23,7 +80,21 @@
 
   <a class="skip-link" href="#main">본문 바로가기</a>
   <header id="topbar" class="topbar" hidden></header>
-  <main id="main" class="main" tabindex="-1"></main>
+  <main id="main" class="main" tabindex="-1">
+    <!-- 스크립트를 실행하지 않는 검색·AI 크롤러용 본문. 앱이 뜨면 라우터가 이 내용을 바꾼다. -->
+    <article class="seo-fallback">
+      <h1>몽글마을! — 집을 고르고 방을 꾸미는 힐링 소셜 게임</h1>
+      <p>몽글마을은 빈집을 골라 입주하고, 가구로 방을 꾸미고, 이웃과 안부 쪽지를 나누는 무료 웹 게임이에요. 설치 없이 브라우저에서 바로 시작할 수 있어요.</p>
+      <ul>
+        <li>단독주택 8채와 아파트 10호 중 빈집을 골라 입주해요.</li>
+        <li>가구·벽지·바닥 25가지로 내 방을 꾸며요.</li>
+        <li>이웃에게 쪽지를 보내고, 친구를 맺고, 방에 좋아요를 눌러요.</li>
+        <li>가입하면 환영 선물로 300몽글을 받아요.</li>
+      </ul>
+      <p><a href="about">몽글마을 소개</a> · <a href="faq">자주 묻는 질문</a></p>
+      <noscript><p>몽글마을은 자바스크립트를 켜야 플레이할 수 있어요.</p></noscript>
+    </article>
+  </main>
   <nav id="tabbar" class="tabbar" aria-label="하단 메뉴" hidden></nav>
 
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>

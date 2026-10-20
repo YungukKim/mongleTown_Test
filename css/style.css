@@ -612,3 +612,21 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 .stat .k { font-size: .82rem; color: var(--ink-soft); }
 .stat .v { font-family: var(--font-title); font-size: 1.7rem; font-weight: 700; }
 .inline-input { width: 90px; min-height: 34px; padding: 4px 8px; border: 2px solid var(--ink); border-radius: 8px; }
+
+/* ---------- 검색·AI 크롤러용 정적 본문 (index.html 대체 본문, about·faq 페이지) ---------- */
+.js .seo-fallback { display: none; }
+.static-page { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+.static-page header { margin-bottom: 24px; }
+.static-page .crumbs { font-size: .95rem; color: var(--ink-soft); margin: 0 0 12px; }
+.static-page .crumbs a { color: inherit; }
+.static-page h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); }
+.static-page h2 { margin-top: 2em; font-size: 1.4rem; }
+.static-page p, .static-page li { line-height: 1.75; }
+.static-page .lead { font-size: 1.1rem; }
+.static-page .card { padding: 16px 20px; margin: 12px 0; }
+.static-page details.card summary { cursor: pointer; font-weight: 700; font-family: var(--font-title); font-size: 1.15rem; }
+.static-page details.card[open] summary { margin-bottom: 8px; }
+.static-page .cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0; }
+.static-page footer { margin-top: 48px; color: var(--ink-soft); font-size: .9rem; }
+.static-page table { width: 100%; border-collapse: collapse; }
+.static-page th, .static-page td { border-bottom: 1.5px dashed var(--ink-faint); padding: 8px 4px; text-align: left; }
