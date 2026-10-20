@@ -58,7 +58,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   3. Edge Function `toss-payments`(`action: confirm`)가 처리한다.
      - DB 주문 금액과 비교한 뒤 토스 승인 API를 호출한다.
      - 승인되면 `_confirm_grant`가 주문을 잠그고 한 번만 지급한다.
+     - 승인 API가 실패해도 토스 결제 조회 결과가 이 주문으로 DONE이면 지급한다(지급 직전에 끊긴 재시도 복구).
   4. 관리자 환불은 같은 함수의 `action: cancel`이다.
+     - `_refund_apply`가 잔액을 잠그고 유료 몽글을 먼저 회수한 뒤 토스 취소를 부른다. 취소가 실패하면 `_refund_revert`가 반대 기록으로 되돌리고, 성공하면 `_refund_done`이 로그를 남긴다.
+  - 잔액을 읽고 쓰는 함수는 `pg_advisory_xact_lock(hashtext('wallet:' || user_id))`로 같은 잠금을 건다.
   - 시크릿 키는 Edge Function 시크릿 `TOSS_SECRET_KEY`에 둔다. 없으면 토스 문서용 공개 테스트 키를 쓴다. 클라이언트 키는 `js/config.js`에 있다.
 - **변경 방법**
   - 스키마 변경은 Supabase MCP `apply_migration`으로 적용한다. 적용한 SQL은 `supabase/migrations/<version>_<name>.sql`로 저장소에도 남긴다(기존 파일은 이미 적용된 기록이다).
