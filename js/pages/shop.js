@@ -1,0 +1,245 @@
+/* =========================================================
+   상점 · 재화 충전(토스페이먼츠 흐름 목업) · 구매 내역
+   ========================================================= */
+
+const POUCH_SVG = n => `<svg viewBox="0 0 100 90" fill="#fff" stroke="#222" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="wobble" aria-hidden="true">
+  ${n >= 3 ? '<path d="M8 40h84l-6 46H14z"/><path d="M8 40l10-12h64l10 12" />' : n === 2 ? '<path d="M12 44q-4 40 38 42 42-2 38-42z"/><path d="M8 44h84" /><path d="M20 44q-2-10 6-10M80 44q2-10-6-10" fill="none"/>' : '<path d="M30 30q-24 20-12 44 10 14 32 14t32-14q12-24-12-44z"/><path d="M30 30q20 8 40 0M38 30l-6-14q18 6 36 0l-6 14" />'}
+  ${Array.from({ length: n + 1 }, (_, i) => `<circle cx="${32 + i * 12}" cy="${n >= 3 ? 34 : 26 - (i % 2) * 6}" r="8"/>`).join('')}
+</svg>`;
+
+Pages.shop = (el, params) => {
+  let cat = params.cat || 'all';
+  let alive = true;
+  const render = async () => {
+    const items = await Api.getShop();
+    if (!alive) return;
+    const bal = Api.balanceSync();
+    const shown = items.filter(i => cat === 'all' || i.cat === cat);
+    el.innerHTML = `
+      <div class="page-head">
+        <div><h1>몽글 상점</h1><p class="sub">결제하지 않아도 기본 가구로 충분히 꾸밀 수 있어요.</p></div>
+        <div class="row"><a class="btn sm ghost" href="#/history">${icon('receipt')}구매 내역</a><a class="btn sm" href="#/charge">${icon('coin')}${fmt(bal.total)} · 충전</a></div>
+      </div>
+      <div class="tabs" role="tablist" aria-label="아이템 종류">
+        ${CATEGORIES.map(c => `<button class="tab" role="tab" aria-selected="${cat === c.id}" data-cat="${c.id}">${c.name}</button>`).join('')}
+      </div>
+      <div class="shop-grid" role="list">
+        ${shown.map(i => `
+          <button class="item-card ${i.sale ? '' : 'soldout'}" type="button" role="listitem" data-item="${i.id}"
+            aria-label="${esc(i.name)}, ${fmt(i.price)}몽글${i.owned ? `, ${i.owned}개 보유` : ''}${i.sale ? '' : ', 판매 중지'}">
+            <span class="art-box">${itemArt(i)}</span>
+            <span class="name">${esc(i.name)}</span>
+            <span class="price">${icon('coin')}${fmt(i.price)}</span>
+            ${i.owned ? `<span class="own tag">${icon('check')}${i.stack ? `${i.owned}개 보유` : '보유 중'}</span>` : ''}
+            ${i.sale ? '' : '<span class="own tag dashed">판매 중지</span>'}
+          </button>`).join('') || emptyState('이 칸은 아직 비어 있어요')}
+      </div>`;
+    $$('[data-cat]', el).forEach(t => t.addEventListener('click', () => { cat = t.dataset.cat; render(); }));
+    $$('[data-item]', el).forEach(b => b.addEventListener('click', () => openItem(items.find(i => i.id === b.dataset.item))));
+  };
+
+  const openItem = item => {
+    const bal = Api.balanceSync();
+    const ownedBlock = !item.stack && item.owned;
+    const { close } = openModal({
+      title: item.name,
+      body: `
+        <div class="preview-box">${item.type === 'furniture' ? itemArt(item) : `<span class="swatch" style="background:${item.bg};width:100%;height:100%"></span>`}</div>
+        <p>${esc(item.desc)}</p>
+        <p class="small muted">${{ furniture: '방에 자유롭게 놓을 수 있는 물건', wallpaper: '방 벽 전체를 바꾸는 벽지', floor: '방 바닥 전체를 바꾸는 바닥재' }[item.type]}
+          · ${item.stack ? '여러 개 살 수 있어요' : '하나만 가질 수 있어요'}${item.owned ? ` · 지금 ${item.owned}개 가지고 있어요` : ''}</p>`,
+      actions: [
+        { label: '닫기' },
+        ownedBlock
+          ? { label: '이미 가지고 있어요', kind: 'ghost', onClick: () => {} }
+          : !item.sale
+            ? { label: '판매 중지', kind: 'ghost', onClick: () => {} }
+            : { label: `${fmt(item.price)}몽글에 사기`, kind: 'primary', icon: 'coin', onClick: c => { c(); buyFlow(item, bal); } },
+      ],
+    });
+  };
+
+  const buyFlow = async (item, bal) => {
+    if (bal.total < item.price) {
+      const go = await confirmDialog({
+        title: '몽글이 조금 모자라요',
+        html: `<table class="receipt"><tr><td>${esc(item.name)}</td><td>${fmt(item.price)}몽글</td></tr><tr><td>지금 가진 몽글</td><td>${fmt(bal.total)}몽글</td></tr><tr class="total"><td>부족한 몽글</td><td>${fmt(item.price - bal.total)}몽글</td></tr></table>`,
+        ok: '충전하러 가기', cancel: '다음에 할게요',
+      });
+      if (go) App.go('#/charge');
+      return;
+    }
+    const idemKey = uid('k_'); // 이 확인 창에서 만든 요청은 한 번만 처리
+    openModal({
+      title: '이 물건을 살까요?',
+      body: `<div class="row" style="justify-content:center">${itemArt(item)}</div>
+        <table class="receipt">
+          <tr><td>아이템</td><td>${esc(item.name)}</td></tr>
+          <tr><td>가격</td><td>${fmt(item.price)}몽글</td></tr>
+          <tr><td>지금 가진 몽글</td><td>${fmt(bal.total)}몽글</td></tr>
+          <tr class="total"><td>구매 후 남는 몽글</td><td>${fmt(bal.total - item.price)}몽글</td></tr>
+        </table>
+        <p class="small muted">무료로 받은 몽글이 먼저 사용돼요. 구매한 아이템은 보관함으로 바로 들어가요.</p>`,
+      actions: [
+        { label: '취소' },
+        { label: '살게요', kind: 'primary', icon: 'check', onClick: (close, btn) => quiet(run(btn, async () => {
+          await Api.buyItem(item.id, idemKey);
+          close();
+          openModal({
+            title: '새로운 물건이 도착했어요!',
+            body: `<div class="preview-box">${itemArt(item)}</div><p class="center">${esc(item.name)}이(가) 보관함에 들어갔어요.</p>`,
+            actions: [{ label: '계속 구경하기' }, { label: '방에 놓으러 가기', kind: 'primary', icon: 'home', onClick: c => { c(); App.go('#/room'); } }],
+          });
+          render();
+        })) },
+      ],
+    });
+  };
+
+  render();
+  return () => { alive = false; };
+};
+
+/* ---------- 충전 ---------- */
+Pages.charge = (el) => {
+  let selected = null;
+  let alive = true;
+  const render = async () => {
+    const products = await Api.getProducts();
+    if (!alive) return;
+    const acc = Api.myAccount();
+    const bal = acc.balance;
+    const minorBlocked = acc.minor && !acc.guardianConsent;
+    el.innerHTML = `
+      <div class="page-head">
+        <div><h1>몽글 충전</h1><p class="sub">충전은 선택이에요. 결제하지 않아도 마을 생활은 충분히 즐거워요.</p></div>
+        <a class="btn sm ghost" href="#/history">${icon('receipt')}충전·구매 내역</a>
+      </div>
+      <div class="card balance-card">
+        <div><div class="small muted">지금 가진 몽글</div><div class="amount">${icon('coin')}${fmt(bal.total)}</div></div>
+        <div class="small muted">충전한 몽글 ${fmt(bal.paid)} · 선물받은 몽글 ${fmt(bal.free)}</div>
+      </div>
+      ${minorBlocked ? `<div class="notice mt-2">${icon('shield')}<div>보호자 동의가 확인되지 않아 충전할 수 없어요. 보호자 이메일의 동의 링크를 확인해 주세요.</div></div>` : ''}
+      <h2 class="mt-3">충전 상품</h2>
+      <div class="product-grid" role="radiogroup" aria-label="충전 상품">
+        ${products.map((p, i) => {
+          const base = p.price / 10;
+          const bonus = Math.round((p.coins / base - 1) * 100);
+          return `<button class="card product-card" type="button" role="radio" aria-checked="${selected === p.id}" aria-pressed="${selected === p.id}" data-p="${p.id}">
+            <div class="pouch">${POUCH_SVG(Math.min(i, 3))}</div>
+            <h3>${esc(p.name)}</h3>
+            <div class="coins">${fmt(p.coins)}몽글</div>
+            <div class="bonus muted">${bonus > 0 ? `+${bonus}% 더 드려요` : '&nbsp;'}</div>
+            <div class="won">${fmt(p.price)}원</div>
+          </button>`;
+        }).join('')}
+      </div>
+      <div class="row mt-3" style="justify-content:center">
+        <button class="btn primary lg" id="pay" ${!selected || minorBlocked ? 'disabled' : ''}>${selected ? `${fmt(products.find(p => p.id === selected).price)}원 결제하기` : '상품을 골라주세요'}</button>
+      </div>
+      <div class="notice mt-3 small">${icon('info')}<div>
+        · 결제 금액은 서버에 저장된 주문 금액과 비교해 검증한 뒤 몽글을 지급해요.<br>
+        · 충전한 몽글은 사용하지 않은 경우 7일 이내 환불을 요청할 수 있어요. (정책 확정 필요)<br>
+        · 표시된 금액은 기획 검토용 예시예요.</div></div>`;
+    $$('[data-p]', el).forEach(b => b.addEventListener('click', () => { selected = b.dataset.p; render(); }));
+    const payBtn = $('#pay', el);
+    payBtn.addEventListener('click', () => quiet(run(payBtn, async () => {
+      const order = await Api.createOrder(selected); // 1) 서버 주문 생성
+      openTossMock(order);
+    })));
+  };
+
+  /* 토스페이먼츠 결제위젯 자리 — 실제 연동 시 SDK 위젯으로 교체 */
+  const openTossMock = order => {
+    const body = document.createElement('div');
+    body.innerHTML = `
+      <div class="notice small">${icon('info')}<div>토스페이먼츠 결제위젯이 들어갈 자리예요. 실제 결제는 일어나지 않아요.</div></div>
+      <div class="toss-mock">
+        <div class="toss-head"><span>${esc(order.orderName)}</span><span>${fmt(order.amount)}원</span></div>
+        <div class="small muted" style="margin-bottom:8px">주문번호 ${esc(order.orderId)}</div>
+        <div class="pay-methods" role="radiogroup" aria-label="결제 수단">
+          ${['카드', '간편결제', '계좌이체'].map((m, i) => `<label><input type="radio" name="method" value="${m}" ${i === 0 ? 'checked' : ''}/>${m}</label>`).join('')}
+        </div>
+        <label class="check small"><input type="checkbox" id="agree-pay" /> <span>주문 내용을 확인했고, 결제에 동의해요.</span></label>
+      </div>
+      <details class="mt-2 small"><summary>검토용 테스트 옵션</summary>
+        <label class="check"><input type="radio" name="sim" value="ok" checked /> <span>정상 승인</span></label>
+        <label class="check"><input type="radio" name="sim" value="fail" /> <span>카드사 거절(결제 실패)</span></label>
+        <label class="check"><input type="radio" name="sim" value="tamper" /> <span>금액 위변조 요청 (서버 검증에서 차단)</span></label>
+        <label class="check"><input type="radio" name="sim" value="double" /> <span>승인 요청 두 번 보내기 (한 번만 지급)</span></label>
+      </details>`;
+    let finished = false;
+    openModal({
+      title: '결제하기', body,
+      onClose: () => { if (!finished) Api.failOrder(order.orderId, 'USER_CANCEL', '사용자가 결제창을 닫음'); },
+      actions: [
+        { label: '취소' },
+        { label: `${fmt(order.amount)}원 결제`, kind: 'primary', onClick: async (close, btn) => {
+          if (!$('#agree-pay', body).checked) { toast('결제 동의에 체크해 주세요.', { kind: 'error' }); return; }
+          const sim = $('input[name=sim]:checked', body).value;
+          const method = $('input[name=method]:checked', body).value;
+          btn.classList.add('loading'); btn.disabled = true;
+          if (sim === 'fail') {
+            await Api.failOrder(order.orderId, 'REJECT_CARD_COMPANY', '카드사에서 결제를 거절했어요.');
+            finished = true; close();
+            return showResult(false, '카드사에서 결제를 거절했어요. 다른 결제 수단으로 다시 시도해 주세요.');
+          }
+          const paymentKey = 'tpk_' + uid();
+          const amount = sim === 'tamper' ? 10 : order.amount; // 위변조 흉내: 클라이언트가 금액을 바꿔 보냄
+          try {
+            const res = await Api.confirmPayment({ orderId: order.orderId, paymentKey, amount, method });
+            if (sim === 'double') {
+              try { await Api.confirmPayment({ orderId: order.orderId, paymentKey, amount, method }); }
+              catch (e2) { toast('두 번째 승인 요청은 막혔어요: ' + e2.message, { icon: 'shield', kind: 'info', duration: 4200 }); }
+            }
+            finished = true; close();
+            showResult(true, `${fmt(order.coins)}몽글이 들어왔어요! 지금 가진 몽글은 ${fmt(res.balance.total)}몽글이에요.`);
+          } catch (e) {
+            finished = true; close();
+            showResult(false, e.message);
+          }
+        } },
+      ],
+    });
+  };
+
+  const showResult = (ok, text) => {
+    openModal({
+      title: ok ? '충전이 끝났어요!' : '결제가 완료되지 않았어요',
+      body: `<div class="result-art">${icon(ok ? 'sparkle' : 'alert', 'class="wobble"')}</div><p class="center">${esc(text)}</p>${ok ? '' : '<p class="center small muted">결제가 되지 않았다면 몽글도 차감되지 않아요.</p>'}`,
+      actions: ok ? [{ label: '내역 보기', onClick: c => { c(); App.go('#/history'); } }, { label: '상점으로', kind: 'primary', onClick: c => { c(); App.go('#/shop'); } }]
+        : [{ label: '닫기', kind: 'primary' }],
+    });
+    selected = null;
+    render();
+  };
+
+  render();
+  return () => { alive = false; };
+};
+
+/* ---------- 내역 ---------- */
+Pages.history = (el) => {
+  let tab = 'tx';
+  let alive = true;
+  const TX = { charge: '충전', purchase: '아이템 구매', event: '이벤트 지급', refund: '환불 조정', admin: '관리자 조정' };
+  const ORDER = { READY: '결제 대기', DONE: '결제 완료', FAILED: '결제 실패', CANCELED: '결제 취소', REFUNDED: '환불 완료' };
+  const render = async () => {
+    const h = await Api.getHistory();
+    if (!alive) return;
+    el.innerHTML = `
+      <div class="page-head"><div><h1>몽글 내역</h1><p class="sub">몽글이 들어오고 나간 모든 기록이에요.</p></div><a class="btn sm" href="#/charge">${icon('coin')}충전하기</a></div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="${tab === 'tx'}" data-t="tx">몽글 변동</button>
+        <button class="tab" role="tab" aria-selected="${tab === 'orders'}" data-t="orders">결제 내역</button>
+      </div>
+      <div class="card"><ul class="list">
+        ${tab === 'tx'
+          ? h.tx.map(t => { const amt = t.paid + t.free; return `<li class="list-item"><div class="grow"><div class="title">${esc(t.reason || TX[t.type])}</div><div class="meta">${TX[t.type]} · ${dateTime(t.at)}${t.free && t.paid ? ` · 무료 ${fmt(t.free)} / 유료 ${fmt(t.paid)}` : t.free ? ' · 무료 몽글' : ' · 유료 몽글'}</div></div><strong>${amt > 0 ? '+' : ''}${fmt(amt)}</strong></li>`; }).join('') || `<li>${emptyState('아직 기록이 없어요')}</li>`
+          : h.orders.map(o => `<li class="list-item"><div class="grow"><div class="title">${esc(o.productName)} · ${fmt(o.amount)}원</div><div class="meta">${esc(o.orderId)} · ${dateTime(o.createdAt)}${o.method ? ' · ' + esc(o.method) : ''}${o.failReason ? ' · ' + esc(o.failReason) : ''}</div></div><span class="tag ${o.status === 'DONE' ? 'solid' : 'dashed'}">${ORDER[o.status]}</span></li>`).join('') || `<li>${emptyState('결제 내역이 없어요')}</li>`}
+      </ul></div>`;
+    $$('[data-t]', el).forEach(b => b.addEventListener('click', () => { tab = b.dataset.t; render(); }));
+  };
+  render();
+  return () => { alive = false; };
+};
