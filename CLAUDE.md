@@ -83,3 +83,4 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 절대 주소(canonical, og:url, sitemap, robots의 Sitemap, llms.txt 링크)는 배포 도메인을 그대로 쓴다. 도메인이 바뀌면 저장소 전체에서 이전 주소를 찾아 바꾼다.
 - `og-image.png`(1200×630)와 `icon-512.png`는 PowerShell `System.Drawing`으로 그렸다. 다시 만들 때도 흑백 선화 규칙을 지킨다.
 - `vercel.json`의 `cleanUrls`로 `/about`, `/faq`가 열린다. 로컬 `serve.ps1`도 같은 방식으로 확장자 없는 주소를 처리한다.
+- Google Search Console에 URL 접두어 속성 `https://mongletowntest.vercel.app/`로 등록돼 있고 sitemap.xml을 제출했다. 소유권 확인 파일 `google7e65cd3ca82e4d29.html`을 지우면 인증이 풀리니 남겨 둔다(cleanUrls로 확장자 없는 주소로 리디렉션돼도 인증은 통과했다).
