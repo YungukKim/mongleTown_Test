@@ -198,7 +198,7 @@ async function openApartment({ onChanged } = {}) {
   const unitBtn = h => {
     const state = h.mine ? '내 집' : h.occupantId ? `${h.occupantName}님` : h.available ? '빈방' : '입주 준비 중';
     const kind = h.mine ? 'mine' : h.occupantId ? 'occupied' : 'empty';
-    const likes = h.occupantId ? Api.roomLikes(h.occupantId).count : 0;
+    const likes = h.likes || 0;
     return `<button type="button" class="apt-unit ${kind}" data-unit="${h.id}" aria-label="${h.no}호, ${esc(state)}${h.occupantId ? `, 좋아요 ${likes}개` : ''}">
       <span class="no">${h.no}호</span>
       <span class="who">${h.mine ? '★ ' : ''}${esc(state)}</span>
@@ -244,7 +244,7 @@ async function openHomeDetail(homeId, { onChanged } = {}) {
   } else if (r) {
     const rel = { friend: '<span class="tag solid">친구</span>', sent: '<span class="tag dashed">요청 보냄</span>', received: '<span class="tag dashed">나에게 요청함</span>', blocked: '<span class="tag">차단함</span>' }[r.relation] || '';
     residentHTML = `<div class="resident-box">${avatar(r.nickname)}<div class="grow"><strong>${esc(r.nickname)}</strong> ${rel}
-      <span class="tag" aria-label="방 좋아요 ${Api.roomLikes(r.id).count}개">${icon('heart')}${Api.roomLikes(r.id).count}</span><br>
+      <span class="tag" aria-label="방 좋아요 ${r.likes || 0}개">${icon('heart')}${r.likes || 0}</span><br>
       <span class="small muted">${r.bio !== null ? esc(r.bio || '소개가 아직 없어요.') : '소개를 공개하지 않았어요.'}</span></div></div>`;
   } else {
     residentHTML = `<div class="resident-box">${icon('door')}<div><strong>${d.available ? '아무도 살지 않는 빈집이에요' : '지금은 입주를 준비 중인 집이에요'}</strong><br><span class="small muted">${d.available ? '마음에 든다면 입주해 보세요.' : '조금만 기다려 주세요.'}</span></div></div>`;

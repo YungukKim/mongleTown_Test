@@ -50,8 +50,7 @@ Pages.mypage = (el) => {
           <h2 class="mt-3" style="font-size:1.5rem">계정</h2>
           <div class="stack">
             <button class="btn w-full" id="logout">${icon('logout')}로그아웃</button>
-            <a class="btn w-full ghost" href="#/admin">${icon('settings')}관리자 화면 (데모)</a>
-            <button class="btn w-full ghost" id="reset-demo">${icon('undo')}데모 데이터 초기화</button>
+            ${acc.role === 'admin' ? `<a class="btn w-full ghost" href="#/admin">${icon('settings')}관리자 화면</a>` : ''}
             <button class="link-btn small muted" id="withdraw">회원 탈퇴</button>
           </div>
         </section>
@@ -79,12 +78,8 @@ Pages.mypage = (el) => {
     }));
     $('#reduce', el).addEventListener('change', e => { Store.setPrefs({ reduceMotion: e.target.checked }); applyPrefs(); render(); });
     $('#logout', el).addEventListener('click', async () => {
-      if (!(await confirmDialog({ title: '로그아웃할까요?', text: '집과 방은 그대로 기다리고 있을게요.', ok: '로그아웃' }))) return;
-      Api.logout(); toast('또 놀러 와요!', { icon: 'heart' }); App.go('#/start');
-    });
-    $('#reset-demo', el).addEventListener('click', async () => {
-      if (!(await confirmDialog({ title: '데모 데이터를 초기화할까요?', text: '이 브라우저에 저장된 모든 계정, 집, 쪽지, 결제 기록이 처음 상태로 돌아가요.', ok: '초기화', danger: true }))) return;
-      Store.reset(); toast('처음 상태로 돌아왔어요.'); App.go('#/start');
+      if (!(await confirmDialog({ title: '로그아웃할까요?', text: acc.guest ? '체험 계정은 로그아웃하면 다시 들어올 수 없어요. 계속할까요?' : '집과 방은 그대로 기다리고 있을게요.', ok: '로그아웃', danger: acc.guest }))) return;
+      await Api.logout(); toast('또 놀러 와요!', { icon: 'heart' }); App.go('#/start');
     });
     $('#withdraw', el).addEventListener('click', () => {
       const body = document.createElement('div');

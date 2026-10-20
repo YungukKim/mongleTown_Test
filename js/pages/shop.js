@@ -100,12 +100,14 @@ Pages.shop = (el, params) => {
   return () => { alive = false; };
 };
 
-/* ---------- 충전 ---------- */
+/* ---------- 충전 (토스페이먼츠 결제위젯, 테스트 모드) ---------- */
 Pages.charge = (el) => {
   let selected = null;
   let alive = true;
   const render = async () => {
-    const products = await Api.getProducts();
+    let products;
+    try { products = await Api.getProducts(); }
+    catch (e) { el.innerHTML = emptyState('충전 상품을 불러오지 못했어요.', e.message, 'alert'); return; }
     if (!alive) return;
     const acc = Api.myAccount();
     const bal = acc.balance;
@@ -119,12 +121,11 @@ Pages.charge = (el) => {
         <div><div class="small muted">지금 가진 몽글</div><div class="amount">${icon('coin')}${fmt(bal.total)}</div></div>
         <div class="small muted">충전한 몽글 ${fmt(bal.paid)} · 선물받은 몽글 ${fmt(bal.free)}</div>
       </div>
-      ${minorBlocked ? `<div class="notice mt-2">${icon('shield')}<div>보호자 동의가 확인되지 않아 충전할 수 없어요. 보호자 이메일의 동의 링크를 확인해 주세요.</div></div>` : ''}
+      ${minorBlocked ? `<div class="notice mt-2">${icon('shield')}<div>보호자 동의가 확인되지 않아 충전할 수 없어요. 보호자 동의가 확인되면 운영팀이 열어드려요.</div></div>` : ''}
       <h2 class="mt-3">충전 상품</h2>
       <div class="product-grid" role="radiogroup" aria-label="충전 상품">
         ${products.map((p, i) => {
-          const base = p.price / 10;
-          const bonus = Math.round((p.coins / base - 1) * 100);
+          const bonus = Math.round((p.coins / (p.price / 10) - 1) * 100);
           return `<button class="card product-card" type="button" role="radio" aria-checked="${selected === p.id}" aria-pressed="${selected === p.id}" data-p="${p.id}">
             <div class="pouch">${POUCH_SVG(Math.min(i, 3))}</div>
             <h3>${esc(p.name)}</h3>
@@ -138,69 +139,87 @@ Pages.charge = (el) => {
         <button class="btn primary lg" id="pay" ${!selected || minorBlocked ? 'disabled' : ''}>${selected ? `${fmt(products.find(p => p.id === selected).price)}원 결제하기` : '상품을 골라주세요'}</button>
       </div>
       <div class="notice mt-3 small">${icon('info')}<div>
+        · 토스페이먼츠 <strong>테스트 모드</strong>예요. 카드 정보를 넣어도 실제로 돈이 나가지 않아요.<br>
         · 결제 금액은 서버에 저장된 주문 금액과 비교해 검증한 뒤 몽글을 지급해요.<br>
-        · 충전한 몽글은 사용하지 않은 경우 7일 이내 환불을 요청할 수 있어요. (정책 확정 필요)<br>
         · 표시된 금액은 기획 검토용 예시예요.</div></div>`;
     $$('[data-p]', el).forEach(b => b.addEventListener('click', () => { selected = b.dataset.p; render(); }));
     const payBtn = $('#pay', el);
     payBtn.addEventListener('click', () => quiet(run(payBtn, async () => {
-      const order = await Api.createOrder(selected); // 1) 서버 주문 생성
-      openTossMock(order);
+      const order = await Api.createOrder(selected); // 1) 서버가 주문과 금액을 만든다
+      await openTossWidget(order);
     })));
   };
 
-  /* 토스페이먼츠 결제위젯 자리 — 실제 연동 시 SDK 위젯으로 교체 */
-  const openTossMock = order => {
+  /* 2) 토스 결제위젯을 띄우고 결제를 요청한다 → successUrl / failUrl 로 돌아온다 */
+  const openTossWidget = async (order) => {
+    if (typeof window.TossPayments !== 'function') throw new ApiError('TOSS_SDK', '토스페이먼츠 결제창을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.');
     const body = document.createElement('div');
     body.innerHTML = `
-      <div class="notice small">${icon('info')}<div>토스페이먼츠 결제위젯이 들어갈 자리예요. 실제 결제는 일어나지 않아요.</div></div>
-      <div class="toss-mock">
-        <div class="toss-head"><span>${esc(order.orderName)}</span><span>${fmt(order.amount)}원</span></div>
-        <div class="small muted" style="margin-bottom:8px">주문번호 ${esc(order.orderId)}</div>
-        <div class="pay-methods" role="radiogroup" aria-label="결제 수단">
-          ${['카드', '간편결제', '계좌이체'].map((m, i) => `<label><input type="radio" name="method" value="${m}" ${i === 0 ? 'checked' : ''}/>${m}</label>`).join('')}
-        </div>
-        <label class="check small"><input type="checkbox" id="agree-pay" /> <span>주문 내용을 확인했고, 결제에 동의해요.</span></label>
-      </div>
-      <details class="mt-2 small"><summary>검토용 테스트 옵션</summary>
-        <label class="check"><input type="radio" name="sim" value="ok" checked /> <span>정상 승인</span></label>
-        <label class="check"><input type="radio" name="sim" value="fail" /> <span>카드사 거절(결제 실패)</span></label>
-        <label class="check"><input type="radio" name="sim" value="tamper" /> <span>금액 위변조 요청 (서버 검증에서 차단)</span></label>
-        <label class="check"><input type="radio" name="sim" value="double" /> <span>승인 요청 두 번 보내기 (한 번만 지급)</span></label>
-      </details>`;
-    let finished = false;
-    openModal({
-      title: '결제하기', body,
-      onClose: () => { if (!finished) Api.failOrder(order.orderId, 'USER_CANCEL', '사용자가 결제창을 닫음'); },
+      <div class="toss-head row between"><strong>${esc(order.orderName)}</strong><strong>${fmt(order.amount)}원</strong></div>
+      <div class="small muted">주문번호 ${esc(order.orderId)}</div>
+      <div id="payment-method"></div>
+      <div id="agreement"></div>`;
+    let leaving = false;
+    const modal = openModal({
+      title: '결제하기', body, wide: true,
+      onClose: () => { if (!leaving) Api.failOrder(order.orderId, 'USER_CANCEL', '사용자가 결제창을 닫음'); },
       actions: [
         { label: '취소' },
         { label: `${fmt(order.amount)}원 결제`, kind: 'primary', onClick: async (close, btn) => {
-          if (!$('#agree-pay', body).checked) { toast('결제 동의에 체크해 주세요.', { kind: 'error' }); return; }
-          const sim = $('input[name=sim]:checked', body).value;
-          const method = $('input[name=method]:checked', body).value;
           btn.classList.add('loading'); btn.disabled = true;
-          if (sim === 'fail') {
-            await Api.failOrder(order.orderId, 'REJECT_CARD_COMPANY', '카드사에서 결제를 거절했어요.');
-            finished = true; close();
-            return showResult(false, '카드사에서 결제를 거절했어요. 다른 결제 수단으로 다시 시도해 주세요.');
-          }
-          const paymentKey = 'tpk_' + uid();
-          const amount = sim === 'tamper' ? 10 : order.amount; // 위변조 흉내: 클라이언트가 금액을 바꿔 보냄
           try {
-            const res = await Api.confirmPayment({ orderId: order.orderId, paymentKey, amount, method });
-            if (sim === 'double') {
-              try { await Api.confirmPayment({ orderId: order.orderId, paymentKey, amount, method }); }
-              catch (e2) { toast('두 번째 승인 요청은 막혔어요: ' + e2.message, { icon: 'shield', kind: 'info', duration: 4200 }); }
-            }
-            finished = true; close();
-            showResult(true, `${fmt(order.coins)}몽글이 들어왔어요! 지금 가진 몽글은 ${fmt(res.balance.total)}몽글이에요.`);
+            leaving = true;
+            await widgets.requestPayment({
+              orderId: order.orderId,
+              orderName: order.orderName,
+              ...Api.paymentUrls(),
+              customerName: Api.myAccount().profile.nickname,
+              ...(Api.myAccount().email ? { customerEmail: Api.myAccount().email } : {}),
+            });
           } catch (e) {
-            finished = true; close();
-            showResult(false, e.message);
+            leaving = false;
+            btn.classList.remove('loading'); btn.disabled = false;
+            // 약관 미동의 등은 결제창 안에서 다시 시도할 수 있게 둔다
+            if (e && e.code === 'NEED_AGREEMENT_WITH_REQUIRED_TERMS') { toast('필수 약관에 동의해 주세요.', { kind: 'error' }); return; }
+            toast((e && e.message) || '결제를 시작하지 못했어요.', { kind: 'error' });
           }
         } },
       ],
     });
+    const payBtn = $$('.modal-actions .btn', modal.el).pop();
+    payBtn.disabled = true;
+    const tossPayments = window.TossPayments(Api.tossClientKey());
+    const widgets = tossPayments.widgets({ customerKey: Api.me().id });
+    try {
+      await widgets.setAmount({ currency: 'KRW', value: order.amount });
+      await Promise.all([
+        widgets.renderPaymentMethods({ selector: '#payment-method', variantKey: 'DEFAULT' }),
+        widgets.renderAgreement({ selector: '#agreement', variantKey: 'AGREEMENT' }),
+      ]);
+      payBtn.disabled = false;
+    } catch (e) {
+      console.error(e);
+      modal.close();
+      toast('결제창을 그리지 못했어요. 잠시 후 다시 시도해 주세요.', { kind: 'error' });
+    }
+  };
+
+  /* 3) 결제창에서 돌아왔을 때: 성공이면 서버 승인, 실패면 기록 */
+  const handleReturn = async (p) => {
+    if (p.status === 'success') {
+      const waiting = openModal({ title: '결제를 확인하는 중이에요', body: loaderHTML('토스페이먼츠에 승인을 요청하고 있어요…'), dismissible: false });
+      try {
+        const res = await Api.confirmPayment({ orderId: p.orderId, paymentKey: p.paymentKey, amount: p.amount });
+        waiting.close();
+        showResult(true, `${fmt(res.order.coins)}몽글이 들어왔어요! 지금 가진 몽글은 ${fmt(res.balance.total)}몽글이에요.`);
+      } catch (e) {
+        waiting.close();
+        showResult(false, e.message);
+      }
+    } else {
+      if (p.orderId) await Api.failOrder(p.orderId, p.code, p.message);
+      showResult(false, p.code === 'PAY_PROCESS_CANCELED' ? '결제를 취소했어요.' : (p.message || '결제가 완료되지 않았어요.'));
+    }
   };
 
   const showResult = (ok, text) => {
@@ -214,7 +233,11 @@ Pages.charge = (el) => {
     render();
   };
 
-  render();
+  render().then(() => {
+    const p = App.pendingPay;
+    App.pendingPay = null;
+    if (p && alive) handleReturn(p);
+  });
   return () => { alive = false; };
 };
 

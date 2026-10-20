@@ -29,7 +29,7 @@ Pages.start = (el) => {
         <a class="btn lg" href="#/signup">처음 왔어요 · 회원가입</a>
         <button class="btn ghost" type="button" id="guest">${icon('eye')}체험 계정으로 둘러보기</button>
       </div>
-      <p class="demo-note">프런트엔드 검토용 데모예요. 모든 데이터는 이 브라우저(localStorage)에만 저장되고, 결제는 실제로 이루어지지 않아요.</p>
+      <p class="demo-note">테스트 서비스예요. 충전은 토스페이먼츠 테스트 모드라 실제로 돈이 나가지 않아요.</p>
     </section>`;
   $('#guest', el).addEventListener('click', e => quiet(run(e.currentTarget, async () => {
     await Api.guestLogin();
@@ -158,8 +158,9 @@ Pages.signup = (el) => {
     if (bad || !reqOk) { (bad || $('#agree-all', el)).focus(); return; }
     const btn = $('button[type=submit]', el);
     try {
-      await run(btn, () => Api.signup({ email: email.value, password: pw.value, nickname: nickChecked, minor, guardianEmail: gEmail.value }));
-      App.go('#/verify?email=' + encodeURIComponent(email.value.trim().toLowerCase()) + (minor ? '&minor=1' : ''));
+      const r = await run(btn, () => Api.signup({ email: email.value, password: pw.value, nickname: nickChecked, minor, guardianEmail: gEmail.value }));
+      if (r.needsVerify) App.go('#/verify?email=' + encodeURIComponent(email.value.trim().toLowerCase()) + (minor ? '&minor=1' : ''));
+      else { toast('가입이 끝났어요! 환영 선물 300몽글이 도착했어요.', { icon: 'sparkle' }); App.go('#/village'); }
     } catch (err) {
       if (err.code === 'EMAIL_TAKEN') fieldError(email, err.message);
       if (err.code === 'NICK_TAKEN') { nickChecked = ''; fieldError(nickInput, err.message); }
@@ -167,7 +168,8 @@ Pages.signup = (el) => {
   });
 };
 
-/* ---------- 이메일 인증 (데모) ---------- */
+
+/* ---------- 이메일 인증 안내 ---------- */
 Pages.verify = (el, params) => {
   const email = params.email || '';
   el.innerHTML = `
@@ -176,23 +178,54 @@ Pages.verify = (el, params) => {
       <div class="card center">
         <div class="result-art">${icon('mail', 'class="wobble"')}</div>
         <h1>편지를 보냈어요!</h1>
-        <p><strong>${esc(email)}</strong> 으로 인증 메일을 보냈어요.<br>메일 속 버튼을 누르면 가입이 끝나요.</p>
-        ${params.minor ? `<div class="notice">${icon('shield')}<div class="small" style="text-align:left">보호자 이메일로도 동의 요청을 보냈어요. 보호자 동의 전에는 유료 충전이 제한돼요.</div></div>` : ''}
-        <div class="notice">${icon('info')}<div class="small" style="text-align:left">데모에서는 실제 메일이 가지 않아요. 아래 버튼으로 인증을 완료할 수 있어요.</div></div>
-        <button class="btn primary lg w-full" id="do-verify">(데모) 메일 속 인증 버튼 누르기</button>
-        <p class="auth-foot small">메일이 안 왔나요? 스팸함을 확인하거나 <button class="link-btn" id="resend">다시 보내기</button></p>
+        <p><strong>${esc(email)}</strong> 으로 인증 메일을 보냈어요.<br>메일 속 링크를 누르면 가입이 끝나고 바로 마을로 들어가요.</p>
+        ${params.minor ? `<div class="notice">${icon('shield')}<div class="small" style="text-align:left">만 14세 미만은 보호자 동의가 확인된 뒤에 유료 충전을 할 수 있어요.</div></div>` : ''}
+        <div class="notice">${icon('info')}<div class="small" style="text-align:left">링크는 이 브라우저에서 열어주세요. 메일이 안 보이면 스팸함도 확인해 주세요.</div></div>
+        <button class="btn lg w-full" id="resend">${icon('mail')}인증 메일 다시 보내기</button>
+        <p class="auth-foot small"><a href="#/login?email=${encodeURIComponent(email)}">이미 인증했어요 · 로그인</a></p>
       </div>
     </div>`;
-  $('#resend', el).addEventListener('click', () => toast('인증 메일을 다시 보냈어요.', { icon: 'mail' }));
-  $('#do-verify', el).addEventListener('click', e => quiet(run(e.currentTarget, async () => {
-    await Api.verifyEmail(email);
-    toast('인증이 끝났어요! 이제 로그인해 주세요.');
-    App.go('#/login?email=' + encodeURIComponent(email));
+  $('#resend', el).addEventListener('click', e => quiet(run(e.currentTarget, async () => {
+    await Api.resendVerification(email);
+    toast('인증 메일을 다시 보냈어요.', { icon: 'mail' });
   })));
 };
 
 /* ---------- 비밀번호 재설정 ---------- */
-Pages.reset = (el) => {
+const PW_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+
+Pages.reset = (el, params) => {
+  // 메일 속 링크로 돌아온 경우: 새 비밀번호 정하기
+  if (params.mode === 'new') {
+    if (!Api.me()) {
+      el.innerHTML = `<div class="auth-wrap"><div class="card center">${emptyState('재설정 링크가 만료되었어요', '비밀번호 재설정을 다시 요청해 주세요.', 'lock')}<a class="btn primary" href="#/reset">다시 요청하기</a></div></div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="auth-wrap">
+        <h1>새 비밀번호 정하기</h1>
+        <form class="card" id="newpw-form" novalidate>
+          <label class="field"><span class="label">새 비밀번호</span><input class="input" id="npw" type="password" autocomplete="new-password" /><span class="hint">영문과 숫자를 섞어 8자 이상</span></label>
+          <label class="field"><span class="label">새 비밀번호 확인</span><input class="input" id="npw2" type="password" autocomplete="new-password" /></label>
+          <button class="btn primary lg w-full" type="submit">새 비밀번호 저장</button>
+        </form>
+      </div>`;
+    $('#newpw-form', el).addEventListener('submit', e => {
+      e.preventDefault();
+      const npw = $('#npw', el), npw2 = $('#npw2', el);
+      fieldError(npw, PW_RULE.test(npw.value) ? '' : '영문과 숫자를 섞어 8자 이상으로 만들어 주세요.');
+      fieldError(npw2, npw.value === npw2.value ? '' : '두 비밀번호가 서로 달라요.');
+      const bad = $('[aria-invalid="true"]', el);
+      if (bad) return bad.focus();
+      quiet(run($('button[type=submit]', el), async () => {
+        await Api.updatePassword(npw.value);
+        toast('비밀번호를 바꿨어요. 다시 만나서 반가워요!', { icon: 'lock' });
+        App.go('#/village');
+      }));
+    });
+    return;
+  }
+
   el.innerHTML = `
     <div class="auth-wrap">
       <h1>비밀번호 다시 만들기</h1>
@@ -210,23 +243,8 @@ Pages.reset = (el) => {
     if (email.getAttribute('aria-invalid')) return email.focus();
     const r = await run($('button[type=submit]', el), () => Api.requestPasswordReset(email.value)).catch(() => null);
     if (!r) return;
-    const card = $('.card', el);
-    card.innerHTML = `
-      <div class="notice solid">${icon('mail')}<div>이 이메일로 가입된 계정이 있다면 재설정 링크를 보냈어요.</div></div>
-      ${r.demoToken ? `
-        <p class="small muted">데모: 메일 속 링크를 누른 것처럼 바로 새 비밀번호를 정할 수 있어요.</p>
-        <label class="field"><span class="label">새 비밀번호</span><input class="input" id="npw" type="password" autocomplete="new-password" /><span class="hint">영문과 숫자를 섞어 8자 이상</span></label>
-        <button class="btn primary w-full" id="do-reset">새 비밀번호 저장</button>` : `<p class="small muted">데모: 가입되지 않은 이메일이라 링크가 발송되지 않았어요. (실서비스에서는 계정 존재 여부를 알려주지 않아요)</p>`}`;
-    const btn = $('#do-reset', card);
-    btn && btn.addEventListener('click', () => {
-      const npw = $('#npw', card);
-      fieldError(npw, /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(npw.value) ? '' : '영문과 숫자를 섞어 8자 이상으로 만들어 주세요.');
-      if (npw.getAttribute('aria-invalid')) return npw.focus();
-      quiet(run(btn, async () => {
-        await Api.resetPassword(r.demoToken, npw.value);
-        toast('비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.');
-        App.go('#/login?email=' + encodeURIComponent(email.value.trim().toLowerCase()));
-      }));
-    });
+    $('.card', el).innerHTML = `
+      <div class="notice solid">${icon('mail')}<div>이 이메일로 가입된 계정이 있다면 재설정 링크를 보냈어요. 메일 속 링크를 이 브라우저에서 열어주세요.</div></div>
+      <a class="btn w-full" href="#/login">로그인으로 돌아가기</a>`;
   });
 };

@@ -34,14 +34,44 @@ const App = {
   current: null,
   skipGuardOnce: false,
 
-  init() {
-    Store.load();
+  pendingPay: null,   // 토스 결제창에서 돌아온 결과 (?pay=success|fail&...)
+
+  async init() {
     applyPrefs();
+    $('#main').innerHTML = loaderHTML('마을로 가는 길…');
+    try {
+      await Api.init();
+    } catch (e) {
+      console.error(e);
+      $('#main').innerHTML = emptyState('서버에 연결하지 못했어요.', '인터넷 연결을 확인하고 새로고침해 주세요.', 'alert');
+      return;
+    }
+    this.consumeUrlParams();
     window.addEventListener('hashchange', () => this.route());
     window.addEventListener('beforeunload', e => { if (this.leaveGuard && this.leaveGuard()) { e.preventDefault(); e.returnValue = ''; } });
-    Bus.on('data', () => this.renderChrome());
+    Bus.on('data', () => { this.renderChrome(); if (this.current && !this.current.route.public && !Api.me()) this.route(); });
     Bus.on('notify', n => toast(n.text, { icon: n.icon || 'bell', kind: 'info', duration: 3600 }));
+    Bus.on('recovery', () => location.replace('#/reset?mode=new'));
+    setInterval(() => { if (Api.me() && !document.hidden) Api.refresh(); }, 20000); // 새 쪽지·친구 요청 확인
     this.route();
+  },
+
+  /* 이메일 링크·결제창에서 돌아왔을 때 붙어 온 쿼리를 처리하고 주소를 정리한다 */
+  consumeUrlParams() {
+    const q = new URLSearchParams(location.search);
+    if (![...q.keys()].length) return;
+    let hash = location.hash || '';
+    const pay = q.get('pay');
+    if (pay) {
+      this.pendingPay = { status: pay, paymentKey: q.get('paymentKey'), orderId: q.get('orderId'), amount: q.get('amount'), code: q.get('code'), message: q.get('message') };
+      hash = '#/charge';
+    }
+    const auth = q.get('auth');
+    if (auth === 'recovery') hash = '#/reset?mode=new';
+    if (auth === 'verified' && Api.me()) { hash = '#/village'; setTimeout(() => toast('이메일 인증이 끝났어요. 몽글마을에 온 걸 환영해요!', { icon: 'heart' }), 300); }
+    const err = q.get('error_description');
+    if (err) setTimeout(() => toast('링크가 만료되었거나 잘못되었어요. 다시 요청해 주세요.', { kind: 'error', duration: 5000 }), 300);
+    history.replaceState(null, '', location.pathname + hash);
   },
 
   go(hash) {

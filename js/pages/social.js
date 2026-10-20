@@ -54,7 +54,7 @@ const Social = {
 
   /* 친구 요청 (확인 창 포함). 성공하면 true */
   async requestFriend(toId, btn) {
-    const prof = Api.getProfile(toId);
+    const prof = await Api.getProfile(toId);
     if (prof.relation === 'received') {
       const req = (await Api.getFriends()).received.find(r => r.other.id === toId);
       if (req) {

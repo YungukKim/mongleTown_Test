@@ -32,8 +32,8 @@ function setLikeButton(btn, r) {
 }
 
 /* 누가 내 방을 좋아했는지 */
-function openLikers(ownerId) {
-  const r = Api.roomLikes(ownerId);
+async function openLikers(ownerId) {
+  const r = await Api.roomLikes(ownerId);
   openModal({
     title: `${r.count}명이 좋아해요`,
     body: r.count
@@ -61,7 +61,7 @@ Pages.room = (el, params) => {
   const ownerId = params.userId || me.id;
   const isMine = ownerId === me.id;
   let alive = true;
-  let room, inventory = [], draft = null, editing = false, selected = null, dirty = false, invTab = 'furniture';
+  let room, prof = null, inventory = [], draft = null, editing = false, selected = null, dirty = false, invTab = 'furniture';
 
   el.innerHTML = loaderHTML('방 문을 여는 중…');
 
@@ -69,6 +69,7 @@ Pages.room = (el, params) => {
     try {
       room = await Api.getRoom(ownerId);
       if (isMine) inventory = await Api.getInventory();
+      else prof = await Api.getProfile(ownerId);
     } catch (e) {
       el.innerHTML = emptyState('방을 찾을 수 없어요.', e.message, 'door') + `<p class="center"><a class="btn" href="#/village">마을로 가기</a></p>`;
       return;
@@ -82,15 +83,17 @@ Pages.room = (el, params) => {
     if (isMine) renderMine(); else renderVisit();
   };
 
+  const reloadVisit = async () => { prof = await Api.getProfile(ownerId); room = await Api.getRoom(ownerId); if (alive) renderVisit(); };
+
   const renderVisit = () => {
-    const prof = Api.getProfile(ownerId);
+
     if (!prof) { el.innerHTML = emptyState('이웃 정보를 찾을 수 없어요.'); return; }
     const rel = prof.relation;
     el.innerHTML = `
       <div class="page-head">
         <div><h1>${esc(prof.nickname)}님의 방</h1><p class="sub">${prof.home ? esc(prof.home.name) : '집 없이 떠도는 중'} · 구경만 할 수 있어요</p></div>
         <div class="row">
-          ${rel === 'blocked' ? '' : likeButtonHTML(Api.roomLikes(ownerId))}
+          ${rel === 'blocked' ? '' : likeButtonHTML(room.likes)}
           <a class="btn sm ghost" href="#/village">${icon('map')}마을로</a>
         </div>
       </div>
@@ -114,12 +117,13 @@ Pages.room = (el, params) => {
       </div>`;
     const on = (id, fn) => { const b = $('#' + id, el); b && b.addEventListener('click', fn); };
     on('msg', () => Social.compose(ownerId));
-    on('friend', e => Social.requestFriend(ownerId, e.currentTarget).then(ok => ok && render()));
-    on('unblock', e => quiet(run(e.currentTarget, async () => { await Api.unblock(ownerId); toast('차단을 풀었어요.'); render(); })));
-    on('more', () => Social.userMenu(ownerId, prof.nickname, render));
+    on('friend', e => Social.requestFriend(ownerId, e.currentTarget).then(ok => ok && reloadVisit()));
+    on('unblock', e => quiet(run(e.currentTarget, async () => { await Api.unblock(ownerId); toast('차단을 풀었어요.'); reloadVisit(); })));
+    on('more', () => Social.userMenu(ownerId, prof.nickname, reloadVisit));
     const likeBtn = $('#like', el);
     likeBtn && likeBtn.addEventListener('click', () => quiet(run(likeBtn, async () => {
       const r = await Api.toggleLike(ownerId);
+      room.likes = r;
       setLikeButton(likeBtn, r);
       toast(r.liked ? `${prof.nickname}님의 방을 좋아해요!` : '좋아요를 취소했어요.', { icon: 'heart', duration: 1600 });
     })));
@@ -145,7 +149,7 @@ Pages.room = (el, params) => {
         <div class="row">
           ${editing
             ? `<button class="btn ghost" id="cancel">${icon('undo')}취소</button><button class="btn primary" id="save">${icon('save')}저장하기</button>`
-            : `<button class="btn sm ghost" id="likers" aria-label="내 방 좋아요 ${Api.roomLikes(ownerId).count}개, 누가 눌렀는지 보기">${icon('heart', 'style="fill:currentColor"')}${fmt(Api.roomLikes(ownerId).count)}명이 좋아해요</button>
+            : `<button class="btn sm ghost" id="likers" aria-label="내 방 좋아요 ${room.likes.count}개, 누가 눌렀는지 보기">${icon('heart', 'style="fill:currentColor"')}${fmt(room.likes.count)}명이 좋아해요</button>
                <button class="btn primary" id="edit">${icon('pencil')}꾸미기</button>`}
         </div>
       </div>
