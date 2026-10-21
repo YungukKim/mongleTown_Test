@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 몽글마을! — 집을 고르고 방을 꾸미고 이웃과 쪽지를 나누는 웹 힐링 소셜 게임. 프런트는 빌드 없는 HTML·CSS·순수 JS(Vercel 정적 배포), 백엔드는 Supabase(Auth·Postgres·RPC·Edge Function), 결제는 토스페이먼츠 결제위젯 v2 테스트 모드. 배포·Supabase Auth 설정 절차는 README.md에 있다.
 
+배포: Vercel 팀 `edu-9e53`의 프로젝트 `mongletowntest` → https://mongletowntest.vercel.app (GitHub `YungukKim/mongleTown_Test`의 main에 push하면 자동 배포). Vercel CLI는 없고 `git push`는 자격 증명이 저장돼 있어 바로 된다.
+
 ## 실행 / 확인
 
 - 빌드·린트·테스트 도구는 없다 (package.json 없음). 이 PC에는 Node가 없고 `python`은 WindowsApps 껍데기라 실행되지 않는다. 일괄 수정은 Bash(sed·heredoc)로 한다.
@@ -14,6 +16,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 확인은 브라우저에서 `Api.*`를 직접 호출하거나 화면을 눌러 본다. 스크립트를 고친 뒤에는 해시만 바꾸지 말고 페이지를 새로고침해야 반영된다.
 - Supabase Auth 설정(익명 로그인 = 체험 계정, Confirm email, Site/Redirect URL)은 MCP로 바꿀 수 없다. 대시보드에서 사용자가 직접 바꿔야 하고, 기본값은 익명 로그인이 꺼져 있다.
 - 테스트 계정이 더 필요하면 MCP `execute_sql`로 `auth.users`(비밀번호는 `extensions.crypt(pw, extensions.gen_salt('bf'))`, `email_confirmed_at = now()`, 토큰 컬럼은 '')와 `auth.identities`(provider 'email', `provider_id = user_id::text`)를 함께 넣는다. 가입 트리거가 프로필과 기본 아이템을 만든다. 비밀번호는 `test-accounts.local.md`에만 적는다.
+- RPC 테스트: `execute_sql` 한 번 안에서 `DO` 블록 → 안쪽 블록에서 `auth.users`에 임시 사용자 insert(트리거가 프로필 생성) → `set_config('role','authenticated',true)`·`set_config('request.jwt.claims', '{"sub":...}', true)`로 사용자 흉내 → 결과를 변수에 모은 뒤 `raise exception`으로 되돌리고 temp 테이블에 담아 select. 운영 데이터가 남지 않는다.
+- `execute_sql`은 여러 문장 중 마지막 결과만 돌려주고, 호출마다 연결이 새로라 temp 테이블·`pg_temp` 함수가 다음 호출에 남지 않는다.
+- 한글이 든 `.ps1`은 UTF-8 BOM을 붙여야 Windows PowerShell 5.1에서 안 깨진다(`printf '\xEF\xBB\xBF'`를 앞에 붙임).
 - 토스 결제창은 다른 도메인의 iframe이라 DOM으로 읽을 수 없다. 카드 결제를 끝까지 하는 확인은 사용자에게 맡긴다.
 - 이 PC에는 git user.name/email이 설정되어 있지 않다. 커밋할 때 `git -c user.name=YungukKim -c user.email=<사용자 이메일> commit ...` 형식으로 지정한다.
 
@@ -65,6 +70,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 시크릿 키는 Edge Function 시크릿 `TOSS_SECRET_KEY`에 둔다. 없으면 토스 문서용 공개 테스트 키를 쓴다. 클라이언트 키는 `js/config.js`에 있다.
 - **변경 방법**
   - 스키마 변경은 Supabase MCP `apply_migration`으로 적용한다. 적용한 SQL은 `supabase/migrations/<version>_<name>.sql`로 저장소에도 남긴다(기존 파일은 이미 적용된 기록이다).
+  - `apply_migration`은 버전을 적용 시각으로 정한다. 적용 후 `list_migrations`로 버전을 확인해 파일명을 맞춘다.
   - 적용된 SQL 원문은 `supabase_migrations.schema_migrations.statements`에 있다. `execute_sql`의 JSON 출력은 역슬래시를 두 번 써서 보여주므로(`E'\\n'`) 파일로 옮길 때 하나로 되돌린다.
   - Edge Function은 `supabase/functions/toss-payments/index.ts`를 고친 뒤 MCP `deploy_edge_function`으로 배포한다(`verify_jwt: true`).
 
